@@ -1,6 +1,6 @@
 const express = require('express')
-const pug = require('pug')
 const bodyParser = require('body-parser')
+const session = require('express-session')
 
 const app = express()
 
@@ -33,21 +33,38 @@ const users = [
     password: 'password'
   }
 ]
-email = undefined
-password = undefined
+
 err = undefined
-name = undefined
 
 
 app.use(express.static('public'))
 app.use(bodyParser.urlencoded({ extended: true }))
 app.set('view engine', 'pug')
 
+app.use(session({
+  key: 'user_sid',
+  secret: 'somerandonstuffs',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    expires: 600000
+  }
+}));
+
+
+
 app.get('/', function (req, res) {
-  console.log(email, password, err)
-  res.render('index', { email, password, err });
-  email = undefined
-  err = undefined
+  console.log(req.session)
+  if (req.session.user) {
+    res.redirect('/welcome')
+  }
+  else if (req.session.email) {
+    res.render('index', { email: req.session.email, err })
+    err = undefined
+  }
+  else {
+    res.render('index');
+  }
 });
 
 app.post('/', (req, res) => {
@@ -55,12 +72,11 @@ app.post('/', (req, res) => {
   password = req.body.password
 
   for (i = 0; i < users.length; i++) {
-    // console.log(users[i].email)
     if (email === users[i].email) {
+      req.session.email = users[i].email
       if (password === users[i].password) {
         err = undefined
-        name = users[i].firstName
-        console.log(name)
+        req.session.user = users[i].firstName
         console.log("Login success")
       }
       else {
@@ -76,9 +92,6 @@ app.post('/', (req, res) => {
   console.log(err)
 
   if (err) {
-    // email = undefined
-    // password = undefined
-    // res.render('index', { email, password, err })
     res.redirect('/')
   }
   else {
@@ -87,7 +100,19 @@ app.post('/', (req, res) => {
 })
 
 app.get('/welcome', (req, res) => {
-  res.render('welcome', { name: name })
+  if (req.session.user) {
+    res.render('welcome', { name: req.session.user })
+  }
+  else {
+    res.redirect('/')
+  }
+
+})
+
+app.get('/logout', (req, res) => {
+  console.log('logout')
+  req.session.destroy()
+  res.redirect('/')
 })
 
 app.listen(port)
